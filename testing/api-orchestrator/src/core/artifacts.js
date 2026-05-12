@@ -14,3 +14,15 @@ export async function writeJsonArtifact(filePath, payload) {
   await fs.writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   return filePath;
 }
+
+// PUBLIC_INTERFACE
+/**
+ * Reads and parses a JSON artifact from disk.
+ *
+ * @param {string} filePath - Absolute artifact path to read.
+ * @returns {Promise<unknown>} Parsed JSON artifact content.
+ */
+export async function readJsonArtifact(filePath) {
+  const rawContent = await fs.readFile(filePath, "utf8");
+  return JSON.parse(rawContent);
+}
