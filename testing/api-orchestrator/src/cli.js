@@ -14,6 +14,10 @@ const commandHandlers = {
   report: runReportCommand
 };
 
+function isFailureStatus(status) {
+  return ["error", "failed"].includes(String(status));
+}
+
 async function runPipelineCommand() {
   const results = [];
   results.push(await runDoctorCommand());
@@ -22,9 +26,14 @@ async function runPipelineCommand() {
   results.push(await runExecuteCommand());
   results.push(await runReportCommand());
 
+  const failingSteps = results
+    .filter((result) => isFailureStatus(result.status))
+    .map((result) => result.command);
+
   return {
     command: "pipeline",
-    status: "ok",
+    status: failingSteps.length > 0 ? "failed" : "ok",
+    failingSteps,
     steps: results
   };
 }
@@ -33,6 +42,11 @@ async function main() {
   if (commandName === "pipeline") {
     const result = await runPipelineCommand();
     console.log(JSON.stringify(result, null, 2));
+
+    if (isFailureStatus(result.status)) {
+      process.exitCode = 1;
+    }
+
     return;
   }
 
@@ -51,6 +65,10 @@ async function main() {
 
   const result = await handler();
   console.log(JSON.stringify(result, null, 2));
+
+  if (isFailureStatus(result.status)) {
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {

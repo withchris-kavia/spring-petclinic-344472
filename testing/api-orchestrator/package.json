@@ -12,9 +12,15 @@
     "discover": "node ./src/cli.js discover",
     "generate": "node ./src/cli.js generate",
     "execute": "node ./src/cli.js execute",
+    "execute:ci": "CI=true API_TEST_HEADLESS=true node ./src/cli.js execute",
+    "execute:parallel": "API_TEST_PARALLELISM=4 node ./src/cli.js execute",
     "report": "node ./src/cli.js report",
+    "report:ci": "CI=true node ./src/cli.js report",
     "pipeline": "node ./src/cli.js pipeline",
+    "pipeline:ci": "CI=true API_TEST_HEADLESS=true node ./src/cli.js pipeline",
+    "pipeline:parallel": "API_TEST_PARALLELISM=4 API_TEST_HEADLESS=true node ./src/cli.js pipeline",
     "test:e2e": "playwright test --config ./playwright.config.js",
+    "test:e2e:ci": "CI=true playwright test --config ./playwright.config.js --reporter=line",
     "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
