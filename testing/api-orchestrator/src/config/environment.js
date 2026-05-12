@@ -14,6 +14,17 @@ function parseInteger(value, defaultValue) {
   return Number.isFinite(parsed) ? parsed : defaultValue;
 }
 
+function parseList(value, defaultValue) {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+
+  return String(value)
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function getWorkspaceRoot() {
   const currentFilePath = fileURLToPath(import.meta.url);
   const currentDirectory = path.dirname(currentFilePath);
@@ -25,6 +36,7 @@ function getWorkspaceRoot() {
  * Loads normalized configuration for the API testing orchestration workspace from environment variables.
  *
  * @returns {{
+ *   applicationRoot: string,
  *   targetBaseUrl: string,
  *   outputDir: string,
  *   timeoutMs: number,
@@ -33,15 +45,23 @@ function getWorkspaceRoot() {
  *   ignoreHttpsErrors: boolean,
  *   mcpTransport: string,
  *   mcpServerCommand: string,
- *   mcpServerArgs: string[]
- * }} Normalized orchestration environment settings.
+ *   mcpServerArgs: string[],
+ *   discoveryAllowRemote: boolean,
+ *   apiSpecCandidatePaths: string[],
+ *   apiSpecCandidateUrls: string[],
+ *   controllerSourceRoots: string[]
+ * }} Normalized orchestration and discovery environment settings.
  */
 export function loadEnvironmentConfig() {
   const workspaceRoot = getWorkspaceRoot();
+  const applicationRoot = path.resolve(workspaceRoot, "..", "..");
   const outputDir = process.env.API_TEST_OUTPUT_DIR ?? "./artifacts";
+  const targetBaseUrl = process.env.API_TEST_TARGET_BASE_URL ?? "http://127.0.0.1:8080";
+  const normalizedBaseUrl = targetBaseUrl.replace(/\/$/, "");
 
   return {
-    targetBaseUrl: process.env.API_TEST_TARGET_BASE_URL ?? "http://127.0.0.1:8080",
+    applicationRoot,
+    targetBaseUrl,
     outputDir: path.resolve(workspaceRoot, outputDir),
     timeoutMs: parseInteger(process.env.API_TEST_TIMEOUT_MS, 30_000),
     parallelism: Math.max(parseInteger(process.env.API_TEST_PARALLELISM, 2), 1),
@@ -52,7 +72,23 @@ export function loadEnvironmentConfig() {
     mcpServerArgs: (process.env.API_TEST_MCP_SERVER_ARGS ?? "")
       .split(/\s+/)
       .map((value) => value.trim())
-      .filter(Boolean)
+      .filter(Boolean),
+    discoveryAllowRemote: parseBoolean(process.env.API_TEST_DISCOVERY_ALLOW_REMOTE, true),
+    apiSpecCandidatePaths: parseList(process.env.API_TEST_OPENAPI_PATHS, [
+      path.resolve(applicationRoot, "openapi.json"),
+      path.resolve(applicationRoot, "swagger.json"),
+      path.resolve(applicationRoot, "src", "main", "resources", "static", "openapi.json"),
+      path.resolve(applicationRoot, "src", "main", "resources", "static", "swagger.json")
+    ]),
+    apiSpecCandidateUrls: parseList(process.env.API_TEST_OPENAPI_URLS, [
+      `${normalizedBaseUrl}/v3/api-docs`,
+      `${normalizedBaseUrl}/swagger.json`,
+      `${normalizedBaseUrl}/v2/api-docs`,
+      `${normalizedBaseUrl}/openapi.json`
+    ]),
+    controllerSourceRoots: parseList(process.env.API_TEST_CONTROLLER_SOURCE_ROOTS, [
+      path.resolve(applicationRoot, "src", "main", "java")
+    ])
   };
 }
 
