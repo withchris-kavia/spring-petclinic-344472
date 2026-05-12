@@ -1,0 +1,23 @@
+{
+  "name": "@spring-petclinic/api-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js orchestration workspace for AI-powered API discovery, test generation, execution, and reporting using MCP and Playwright.",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "doctor": "node ./src/cli.js doctor",
+    "discover": "node ./src/cli.js discover",
+    "generate": "node ./src/cli.js generate",
+    "execute": "node ./src/cli.js execute",
+    "report": "node ./src/cli.js report",
+    "pipeline": "node ./src/cli.js pipeline",
+    "test:e2e": "playwright test --config ./playwright.config.js",
+    "test:e2e:install": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.44.1"
+  }
+}
