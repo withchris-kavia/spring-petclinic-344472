@@ -22,16 +22,17 @@ test.describe("Spring Petclinic preview API response validation", () => {
     expect(vetsPayload.vetList.some((vet) => vet.specialties.length > 0)).toBeTruthy();
   });
 
-  test("returns seeded owner-search HTML for a direct-match flow", async ({ request }) => {
-    const { body, response } = await fetchHtmlResponse(request, "/owners", {
+  test("returns an owner-details redirect for a direct-match search flow", async ({ request }) => {
+    const response = await request.get("/owners", {
+      failOnStatusCode: false,
+      maxRedirects: 0,
       params: {
         lastName: "Franklin"
-      },
-      bodyPatterns: [/Owner Information/i, /George Franklin/i, /Pets and Visits/i]
+      }
     });
 
-    expect(response.ok()).toBeTruthy();
-    expect(body).toContain("George Franklin");
+    expect([302, 303]).toContain(response.status());
+    expect(response.headers().location ?? "").toMatch(/\/owners\/1(?:;jsessionid=[^/?#]+)?$/);
   });
 
   test("returns owner-search validation HTML for a no-match flow", async ({ request }) => {

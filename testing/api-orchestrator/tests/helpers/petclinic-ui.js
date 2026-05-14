@@ -49,7 +49,9 @@ function waitForMilliseconds(delayMs) {
 
 async function expectOwnerDetailsPage(page) {
   await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
-  await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+  await expect(page.locator("table.table-striped").first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Edit Owner/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Add New Pet/i })).toBeVisible();
 }
 
 // PUBLIC_INTERFACE

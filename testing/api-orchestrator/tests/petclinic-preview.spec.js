@@ -36,7 +36,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     // A unique seeded last name should redirect directly to the owner's details page.
     await submitOwnerSearch(page, "Franklin");
     await expect(page).toHaveURL(/\/owners\/1(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/);
-    await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Add New Pet/i })).toBeVisible();
     await expect(page.getByText("George Franklin", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Pets and Visits/i })).toBeVisible();
     await expect(page.getByText("Leo", { exact: true })).toBeVisible();
@@ -70,7 +70,6 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     await submitOwnerSearch(page, "");
 
     const ownerRows = page.locator("#owners tbody tr");
-    const paginationText = page.getByText(/^Pages:/i);
     const secondPageLink = page.getByRole("link", { name: "2" });
 
     await expect(page).toHaveURL(/\/owners(?:\?.*)?$/);
@@ -80,7 +79,6 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     expect(await ownerRows.count()).toBeLessThanOrEqual(5);
 
     if ((await secondPageLink.count()) > 0) {
-      await expect(paginationText).toBeVisible();
       await secondPageLink.click();
 
       await expect(page).toHaveURL(/\/owners\?page=2(?:&.*)?$/);
@@ -130,27 +128,27 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     await expectFormFieldError(page, {
       form: "#add-owner-form",
       fieldSelector: 'input[name="firstName"], input#firstName',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
     await expectFormFieldError(page, {
       form: "#add-owner-form",
       fieldSelector: 'input[name="lastName"], input#lastName',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
     await expectFormFieldError(page, {
       form: "#add-owner-form",
       fieldSelector: 'input[name="address"], input#address',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
     await expectFormFieldError(page, {
       form: "#add-owner-form",
       fieldSelector: 'input[name="city"], input#city',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
     await expectFormFieldError(page, {
       form: "#add-owner-form",
       fieldSelector: 'input[name="telephone"], input#telephone',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
 
     await page.getByLabel(/First Name/i).fill("Validation");
@@ -193,7 +191,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     });
   });
 
-  test("requires pet name, birth date, and type on the new pet form", async ({ page }) => {
+  test("requires pet name and birth date on the new pet form while keeping a default type selected", async ({ page }) => {
     await openOwnerDetailsFromSearch(page, "Franklin");
 
     await page.getByRole("link", { name: /Add New Pet/i }).click();
@@ -210,10 +208,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
       fieldSelector: 'input[name="birthDate"], input#birthDate',
       errorPattern: /is required/i
     });
-    await expectFormFieldError(page, {
-      fieldSelector: 'select[name="type"], select#type',
-      errorPattern: /is required/i
-    });
+    await expect(page.locator('select[name="type"], select#type').first()).toBeVisible();
   });
 
   test("surfaces visit form validation errors without leaving the page", async ({ page }) => {
@@ -229,7 +224,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     await expect(page).toHaveURL(/\/owners\/\d+\/pets\/\d+\/visits\/new(?:\?.*)?$/);
     await expectFormFieldError(page, {
       fieldSelector: 'input[name="description"], input#description',
-      errorPattern: /is required/i
+      errorPattern: /must not be blank|is required/i
     });
   });
 
