@@ -20,8 +20,15 @@
     "pipeline:ci": "CI=true API_TEST_HEADLESS=true node ./src/cli.js pipeline",
     "pipeline:parallel": "API_TEST_PARALLELISM=4 API_TEST_HEADLESS=true node ./src/cli.js pipeline",
     "test:e2e": "playwright test --config ./playwright.config.js",
+    "test:e2e:smoke": "playwright test --config ./playwright.config.js ./tests/petclinic-preview-smoke.spec.js",
+    "test:e2e:regression": "playwright test --config ./playwright.config.js ./tests/petclinic-preview.spec.js ./tests/petclinic-preview-reliability.spec.js",
+    "test:e2e:api": "playwright test --config ./playwright.config.js ./tests/petclinic-preview-api.spec.js",
+    "test:e2e:chromium": "playwright test --config ./playwright.config.js --project=chromium",
+    "test:e2e:firefox": "playwright test --config ./playwright.config.js --project=firefox",
+    "test:e2e:webkit": "playwright test --config ./playwright.config.js --project=webkit",
+    "test:e2e:cross-browser": "playwright test --config ./playwright.config.js --project=chromium --project=firefox --project=webkit",
     "test:e2e:ci": "CI=true playwright test --config ./playwright.config.js",
-    "test:e2e:install": "playwright install --with-deps chromium"
+    "test:e2e:install": "playwright install --with-deps chromium firefox webkit"
   },
   "devDependencies": {
     "@playwright/test": "1.44.1"

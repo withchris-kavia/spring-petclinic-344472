@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import { loadEnvironmentConfig } from "./src/config/environment.js";
 
 const environment = loadEnvironmentConfig();
@@ -30,11 +30,32 @@ export default defineConfig({
   reporter: reporters,
   use: {
     baseURL: environment.targetBaseUrl,
+    headless: environment.headless,
     ignoreHTTPSErrors: environment.ignoreHttpsErrors,
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure"
-  }
+  },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"]
+      }
+    },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"]
+      }
+    },
+    {
+      name: "webkit",
+      use: {
+        ...devices["Desktop Safari"]
+      }
+    }
+  ]
 });

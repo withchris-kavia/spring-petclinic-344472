@@ -12,7 +12,7 @@ import {
   submitOwnerSearch
 } from "./helpers/petclinic-ui.js";
 
-test.describe("Spring Petclinic preview UI core flows", () => {
+test.describe("Spring Petclinic preview regression, UI, and validation flows", () => {
   test("loads the welcome page and supports top-level navigation", async ({ page }) => {
     await gotoRoute(page, "/", /Welcome/i);
 
