@@ -4,7 +4,10 @@ import {
   addVisitForCurrentPet,
   clickPrimaryNavigation,
   createOwner,
+  expectFormFieldError,
+  expectSharedErrorPage,
   gotoRoute,
+  openOwnerDetailsFromSearch,
   openPrimaryNavigationIfNeeded,
   submitOwnerSearch
 } from "./helpers/petclinic-ui.js";
@@ -59,6 +62,24 @@ test.describe("Spring Petclinic preview UI core flows", () => {
     await expect(page.locator("#search-owner-form")).toBeVisible();
   });
 
+  test("supports broad owner search results with pagination links", async ({ page }) => {
+    await gotoRoute(page, "/owners/find", /Find Owners/i);
+
+    await submitOwnerSearch(page, "");
+
+    await expect(page).toHaveURL(/\/owners(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /^Owners$/i })).toBeVisible();
+    await expect(page.locator("#owners tbody tr")).toHaveCount(5);
+    await expect(page.getByText(/^Pages:/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "2" })).toBeVisible();
+
+    await page.getByRole("link", { name: "2" }).click();
+
+    await expect(page).toHaveURL(/\/owners\?page=2$/);
+    await expect(page.getByRole("heading", { name: /^Owners$/i })).toBeVisible();
+    await expect(page.locator("#owners tbody tr")).toHaveCount(5);
+  });
+
   test("completes the owner, pet, and visit forms end to end", async ({ page }) => {
     const uniqueSuffix = `${Date.now()}`;
     const owner = {
@@ -91,32 +112,55 @@ test.describe("Spring Petclinic preview UI core flows", () => {
     await expect(page.locator("#success-message")).toContainText("Your visit has been booked");
   });
 
-  test("validates owner form input and keeps the user on the form", async ({ page }) => {
+  test("validates required owner fields and custom telephone rules", async ({ page }) => {
     await gotoRoute(page, "/owners/new", /^Owner$/i);
+
+    await page.getByRole("button", { name: /Add Owner/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/new(?:\?.*)?$/);
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="firstName"], input#firstName',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="lastName"], input#lastName',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="address"], input#address',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="city"], input#city',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="telephone"], input#telephone',
+      errorPattern: /is required/i
+    });
 
     await page.getByLabel(/First Name/i).fill("Validation");
     await page.getByLabel(/Last Name/i).fill("Check");
     await page.getByLabel(/Address/i).fill("456 Regression Lane");
     await page.getByLabel(/City/i).fill("Verona");
     await page.getByLabel(/Telephone/i).fill("1234");
-
     await page.getByRole("button", { name: /Add Owner/i }).click();
 
     await expect(page).toHaveURL(/\/owners\/new(?:\?.*)?$/);
-    await expect(page.getByRole("heading", { name: /^Owner$/i })).toBeVisible();
-
-    const telephoneGroup = page.locator("#add-owner-form .form-group", {
-      has: page.locator('input[name="telephone"], input#telephone')
-    }).first();
-
-    await expect(telephoneGroup).toContainText(/10-digit number|numeric/i);
-    await expect(page.getByRole("button", { name: /Add Owner/i })).toBeVisible();
+    await expectFormFieldError(page, {
+      form: "#add-owner-form",
+      fieldSelector: 'input[name="telephone"], input#telephone',
+      errorPattern: /10-digit number/i
+    });
   });
 
   test("prevents duplicate pets and invalid birth dates with inline validation", async ({ page }) => {
-    await gotoRoute(page, "/owners/find", /Find Owners/i);
-    await submitOwnerSearch(page, "Franklin");
-    await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+    await openOwnerDetailsFromSearch(page, "Franklin");
 
     await page.getByRole("link", { name: /Add New Pet/i }).click();
     await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
@@ -130,31 +174,54 @@ test.describe("Spring Petclinic preview UI core flows", () => {
     await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
     await expect(page.getByLabel(/^Name$/i)).toHaveValue("Leo");
 
-    const petNameGroup = page.locator("form .form-group", {
-      has: page.locator('input[name="name"], input#name')
-    }).first();
-    const petBirthDateGroup = page.locator("form .form-group", {
-      has: page.locator('input[name="birthDate"], input#birthDate')
-    }).first();
+    await expectFormFieldError(page, {
+      fieldSelector: 'input[name="name"], input#name',
+      errorPattern: /already exists|already in use|duplicate/i
+    });
+    await expectFormFieldError(page, {
+      fieldSelector: 'input[name="birthDate"], input#birthDate',
+      errorPattern: /invalid date/i
+    });
+  });
 
-    await expect(petNameGroup).toContainText(/already in use|already exists|duplicate/i);
-    await expect(petBirthDateGroup).toContainText(/invalid date/i);
+  test("requires pet name, birth date, and type on the new pet form", async ({ page }) => {
+    await openOwnerDetailsFromSearch(page, "Franklin");
+
+    await page.getByRole("link", { name: /Add New Pet/i }).click();
+    await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
+
+    await page.getByRole("button", { name: /Add Pet/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/\d+\/pets\/new(?:\?.*)?$/);
+    await expectFormFieldError(page, {
+      fieldSelector: 'input[name="name"], input#name',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      fieldSelector: 'input[name="birthDate"], input#birthDate',
+      errorPattern: /is required/i
+    });
+    await expectFormFieldError(page, {
+      fieldSelector: 'select[name="type"], select#type',
+      errorPattern: /is required/i
+    });
   });
 
   test("surfaces visit form validation errors without leaving the page", async ({ page }) => {
-    await gotoRoute(page, "/owners/find", /Find Owners/i);
-    await submitOwnerSearch(page, "Franklin");
-    await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+    await openOwnerDetailsFromSearch(page, "Franklin");
 
     await page.getByRole("link", { name: /Add Visit/i }).first().click();
     await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
+    await expect(page.getByLabel(/^Date$/i)).toHaveValue(/\d{4}-\d{2}-\d{2}/);
 
+    await page.getByLabel(/Description/i).fill("");
     await page.getByRole("button", { name: /Add Visit/i }).click();
 
     await expect(page).toHaveURL(/\/owners\/\d+\/pets\/\d+\/visits\/new(?:\?.*)?$/);
-    await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
-    await expect(page.locator("form .has-error").first()).toBeVisible();
-    await expect(page.locator("form")).toContainText(/required|must not|invalid/i);
+    await expectFormFieldError(page, {
+      fieldSelector: 'input[name="description"], input#description',
+      errorPattern: /is required/i
+    });
   });
 
   test("renders the shared error page from the primary navigation", async ({ page }) => {
@@ -164,6 +231,20 @@ test.describe("Spring Petclinic preview UI core flows", () => {
 
     await expect(page.getByText(/internal server error occurred|unexpected error occurred/i)).toBeVisible();
     await expect(page.getByText(/Expected: controller used to showcase/i)).toBeVisible();
+  });
+
+  test("shows the shared error page for a broken owner-details route", async ({ page }) => {
+    await gotoRoute(page, "/owners/999999", /Something happened/i);
+
+    await expectSharedErrorPage(page, /Owner not found with id: 999999/i);
+    await expect(page.getByText(/internal server error occurred|unexpected error occurred/i)).toBeVisible();
+  });
+
+  test("shows the shared error page for a broken nested visit route", async ({ page }) => {
+    await gotoRoute(page, "/owners/1/pets/999999/visits/new", /Something happened/i);
+
+    await expectSharedErrorPage(page, /Pet with id 999999 not found for owner with id 1/i);
+    await expect(page.getByText(/internal server error occurred|unexpected error occurred/i)).toBeVisible();
   });
 
   test("keeps the main navigation usable on a narrow mobile viewport", async ({ page }) => {

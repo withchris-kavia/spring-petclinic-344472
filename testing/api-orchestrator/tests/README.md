@@ -1,24 +1,39 @@
 # Playwright UI Preview Tests
 
-This directory now contains curated Playwright end-to-end coverage for the running Spring Petclinic preview UI on port `3001`.
+This directory contains curated Playwright end-to-end coverage for the running Spring Petclinic preview UI on port `3001`.
 
 ## Current coverage
 
-The `petclinic-preview.spec.js` suite covers the preview application's core user-facing flows:
+The `petclinic-preview.spec.js` suite now covers both the core user journeys and higher-risk UI edge cases:
 
-- welcome page load and shell rendering
-- top-level navigation (`/`, `/owners/find`, `/vets.html`)
-- seeded owner search flows
-- owner creation form
-- pet creation form
-- visit creation form
+- welcome page load and shared shell rendering
+- top-level navigation (`/`, `/owners/find`, `/vets.html`, `/oups`)
+- seeded owner search flows (single match, multi-match, empty broad search, no-match validation)
+- owner creation flow
+- owner-form required-field and telephone validation states
+- pet creation flow
+- pet-form required-field, duplicate-name, and future-date validation states
+- visit creation flow
+- visit-form validation handling
+- shared error page rendering for intentionally broken routes
 - basic mobile/responsive navigation behavior
 
-Reusable helpers live in `tests/helpers/petclinic-ui.js` so future specs can share the same navigation, form, and assertion patterns.
+Reusable helpers live in `tests/helpers/petclinic-ui.js` so future specs can share the same navigation, form, and assertion patterns. In particular, the helpers expose stable utilities for inline form validation assertions and shared error-page checks.
+
+## Selector strategy
+
+The suite intentionally prefers stable, user-facing selectors derived from the server-rendered Thymeleaf templates:
+
+- shared IDs such as `#search-owner-form`, `#owners`, `#vets`, and `#success-message`
+- accessible labels for form fields
+- top-level headings
+- surrounding `.form-group` containers for inline validation assertions
+
+This keeps the assertions aligned with the real UI structure without depending on brittle CSS layout details.
 
 ## Expected target
 
-By default the workspace now points Playwright at:
+By default the workspace points Playwright at:
 
 - `http://127.0.0.1:3001`
 
@@ -43,7 +58,8 @@ Install browser dependencies if needed:
 
 ## Notes
 
-- The suite uses stable user-facing headings, labels, and seeded demo data to keep assertions readable.
-- The owner/pet/visit flow generates unique values so repeated runs do not collide with earlier E2E-created records.
+- The suite uses seeded demo data and stable template selectors to keep assertions readable and maintainable.
+- Owner-detail URL handling tolerates Spring `;jsessionid=...` path rewriting so direct-search flows remain reliable across environments.
+- The owner/pet/visit creation flow generates unique values so repeated runs do not collide with earlier E2E-created records.
 - The tests are written to run independently so one failure does not block the remaining preview coverage.
 - On failure, Playwright retains trace, screenshot, and video artifacts under `artifacts/playwright-output/` and writes JSON/JUnit/HTML reports under `artifacts/reports/`.

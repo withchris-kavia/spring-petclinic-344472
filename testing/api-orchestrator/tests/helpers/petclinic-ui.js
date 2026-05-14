@@ -1,5 +1,8 @@
 import { expect } from "@playwright/test";
 
+const OWNER_DETAILS_URL_PATTERN = /\/owners\/\d+(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/;
+const OWNER_SEARCH_RESULT_URL_PATTERN = /\/owners(?:\/\d+(?:;jsessionid=[^/?#]+)?)?(?:\?.*)?$/;
+
 async function waitForPetclinicShell(page) {
   await expect(page.locator("nav.navbar")).toBeVisible();
   await expect(page.locator("body")).toBeVisible();
@@ -16,7 +19,18 @@ async function getOwnerSearchLastNameField(page) {
   return lastNameField;
 }
 
-const OWNER_DETAILS_URL_PATTERN = /\/owners\/\d+(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/;
+function resolveFormLocator(page, formOrSelector = "form") {
+  if (typeof formOrSelector === "string") {
+    return page.locator(formOrSelector);
+  }
+
+  return formOrSelector;
+}
+
+function getFieldGroup(formLocator, fieldSelector) {
+  const field = formLocator.locator(fieldSelector).first();
+  return formLocator.locator(".form-group", { has: field }).first();
+}
 
 async function expectOwnerDetailsPage(page) {
   await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
@@ -93,7 +107,7 @@ export async function submitOwnerSearch(page, lastName) {
   await expect(submitButton).toBeEnabled({ timeout: 10_000 });
 
   await Promise.all([
-    page.waitForURL(/\/owners(?:\/\d+)?(?:\?.*)?$/, { timeout: 15_000 }),
+    page.waitForURL(OWNER_SEARCH_RESULT_URL_PATTERN, { timeout: 15_000 }),
     submitButton.click()
   ]);
 }
@@ -173,4 +187,55 @@ export async function addVisitForCurrentPet(page, visit) {
 
   await expectOwnerDetailsPage(page);
   await expect(page.getByText(visit.description, { exact: true })).toBeVisible();
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Searches for a seeded owner by last name and verifies the owner details page is displayed.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {string} lastName - Seeded owner last name expected to resolve to a single result.
+ * @returns {Promise<void>} Resolves after the owner details page is visible.
+ */
+export async function openOwnerDetailsFromSearch(page, lastName) {
+  await gotoRoute(page, "/owners/find", /Find Owners/i);
+  await submitOwnerSearch(page, lastName);
+  await expectOwnerDetailsPage(page);
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Asserts that a specific form field renders an inline validation error in its surrounding field group.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {{
+ *   form?: string | import("@playwright/test").Locator,
+ *   fieldSelector: string,
+ *   errorPattern: string | RegExp
+ * }} options - Form scope, target field selector, and expected inline error content.
+ * @returns {Promise<void>} Resolves after the matching inline validation text is visible.
+ */
+export async function expectFormFieldError(page, options) {
+  const formLocator = resolveFormLocator(page, options.form ?? "form");
+  const fieldGroup = getFieldGroup(formLocator, options.fieldSelector);
+
+  await expect(formLocator).toBeVisible();
+  await expect(fieldGroup).toBeVisible();
+  await expect(fieldGroup).toContainText(options.errorPattern);
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Verifies that the Petclinic shared error page is rendered and optionally asserts a specific error detail.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {string | RegExp} [detailPattern] - Optional status/detail message expected on the error page.
+ * @returns {Promise<void>} Resolves after the shared error screen assertions pass.
+ */
+export async function expectSharedErrorPage(page, detailPattern) {
+  await expect(page.getByRole("heading", { name: /Something happened/i })).toBeVisible();
+
+  if (detailPattern) {
+    await expect(page.locator("body")).toContainText(detailPattern);
+  }
 }
