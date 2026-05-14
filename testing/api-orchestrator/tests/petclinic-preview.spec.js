@@ -48,6 +48,17 @@ test.describe("Spring Petclinic preview UI core flows", () => {
     await expect(page.getByRole("link", { name: "Harold Davis" })).toBeVisible();
   });
 
+  test("shows a validation message when no owners match the search", async ({ page }) => {
+    await gotoRoute(page, "/owners/find", /Find Owners/i);
+
+    await submitOwnerSearch(page, `NoMatch${Date.now()}`);
+
+    await expect(page).toHaveURL(/\/owners(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /Find Owners/i })).toBeVisible();
+    await expect(page.locator("#lastNameGroup .help-inline")).toContainText(/not found/i);
+    await expect(page.locator("#search-owner-form")).toBeVisible();
+  });
+
   test("completes the owner, pet, and visit forms end to end", async ({ page }) => {
     const uniqueSuffix = `${Date.now()}`;
     const owner = {
@@ -78,6 +89,81 @@ test.describe("Spring Petclinic preview UI core flows", () => {
 
     await addVisitForCurrentPet(page, visit);
     await expect(page.locator("#success-message")).toContainText("Your visit has been booked");
+  });
+
+  test("validates owner form input and keeps the user on the form", async ({ page }) => {
+    await gotoRoute(page, "/owners/new", /^Owner$/i);
+
+    await page.getByLabel(/First Name/i).fill("Validation");
+    await page.getByLabel(/Last Name/i).fill("Check");
+    await page.getByLabel(/Address/i).fill("456 Regression Lane");
+    await page.getByLabel(/City/i).fill("Verona");
+    await page.getByLabel(/Telephone/i).fill("1234");
+
+    await page.getByRole("button", { name: /Add Owner/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/new(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /^Owner$/i })).toBeVisible();
+
+    const telephoneGroup = page.locator("#add-owner-form .form-group", {
+      has: page.locator('input[name="telephone"], input#telephone')
+    }).first();
+
+    await expect(telephoneGroup).toContainText(/10-digit number|numeric/i);
+    await expect(page.getByRole("button", { name: /Add Owner/i })).toBeVisible();
+  });
+
+  test("prevents duplicate pets and invalid birth dates with inline validation", async ({ page }) => {
+    await gotoRoute(page, "/owners/find", /Find Owners/i);
+    await submitOwnerSearch(page, "Franklin");
+    await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+
+    await page.getByRole("link", { name: /Add New Pet/i }).click();
+    await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
+
+    await page.getByLabel(/^Name$/i).fill("Leo");
+    await page.getByLabel(/Birth Date/i).fill("2099-01-01");
+    await page.getByLabel(/^Type$/i).selectOption({ label: "dog" });
+    await page.getByRole("button", { name: /Add Pet/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/\d+\/pets\/new(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
+    await expect(page.getByLabel(/^Name$/i)).toHaveValue("Leo");
+
+    const petNameGroup = page.locator("form .form-group", {
+      has: page.locator('input[name="name"], input#name')
+    }).first();
+    const petBirthDateGroup = page.locator("form .form-group", {
+      has: page.locator('input[name="birthDate"], input#birthDate')
+    }).first();
+
+    await expect(petNameGroup).toContainText(/already in use|already exists|duplicate/i);
+    await expect(petBirthDateGroup).toContainText(/invalid date/i);
+  });
+
+  test("surfaces visit form validation errors without leaving the page", async ({ page }) => {
+    await gotoRoute(page, "/owners/find", /Find Owners/i);
+    await submitOwnerSearch(page, "Franklin");
+    await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+
+    await page.getByRole("link", { name: /Add Visit/i }).first().click();
+    await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
+
+    await page.getByRole("button", { name: /Add Visit/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/\d+\/pets\/\d+\/visits\/new(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
+    await expect(page.locator("form .has-error").first()).toBeVisible();
+    await expect(page.locator("form")).toContainText(/required|must not|invalid/i);
+  });
+
+  test("renders the shared error page from the primary navigation", async ({ page }) => {
+    await gotoRoute(page, "/", /Welcome/i);
+
+    await clickPrimaryNavigation(page, /Error/i, /\/oups(?:\?.*)?$/, /Something happened/i);
+
+    await expect(page.getByText(/internal server error occurred|unexpected error occurred/i)).toBeVisible();
+    await expect(page.getByText(/Expected: controller used to showcase/i)).toBeVisible();
   });
 
   test("keeps the main navigation usable on a narrow mobile viewport", async ({ page }) => {
