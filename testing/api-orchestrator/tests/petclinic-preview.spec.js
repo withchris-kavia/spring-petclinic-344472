@@ -6,10 +6,15 @@ import {
   createOwner,
   expectFormFieldError,
   expectSharedErrorPage,
+  expectVisitFormSummary,
   gotoRoute,
   openOwnerDetailsFromSearch,
+  openVisitFormForCurrentPet,
   openPrimaryNavigationIfNeeded,
   submitOwnerSearch
+  ,
+  updateCurrentOwner,
+  updateCurrentPet
 } from "./helpers/petclinic-ui.js";
 
 test.describe("Spring Petclinic preview regression, UI, and validation flows", () => {
@@ -18,6 +23,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
 
     await expect(page).toHaveTitle(/PetClinic/i);
     await expect(page.locator(".navbar")).toBeVisible();
+    await expect(page.locator("img.img-responsive")).toBeVisible();
     await expect(page.getByRole("img", { name: /VMware Tanzu Logo/i })).toBeVisible();
 
     // Verify the primary user journeys exposed by the shared navbar.
@@ -85,6 +91,45 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     }
   });
 
+  test("supports the add-owner shortcut and editing owner details from the owner page", async ({ page }) => {
+    const uniqueSuffix = `${Date.now()}`;
+    const owner = {
+      firstName: "Shortcut",
+      lastName: `Owner${uniqueSuffix}`,
+      address: "10 Initial Street",
+      city: "Monona",
+      telephone: "6085551111"
+    };
+    const updatedOwner = {
+      address: "25 Updated Avenue",
+      city: "Fitchburg",
+      telephone: "6085552222"
+    };
+
+    await gotoRoute(page, "/owners/find", /Find Owners/i);
+    await page.getByRole("link", { name: /Add Owner/i }).click();
+
+    await expect(page).toHaveURL(/\/owners\/new(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: /^Owner$/i })).toBeVisible();
+
+    await page.getByLabel(/First Name/i).fill(owner.firstName);
+    await page.getByLabel(/Last Name/i).fill(owner.lastName);
+    await page.getByLabel(/Address/i).fill(owner.address);
+    await page.getByLabel(/City/i).fill(owner.city);
+    await page.getByLabel(/Telephone/i).fill(owner.telephone);
+    await page.getByRole("button", { name: /Add Owner/i }).click();
+
+    await expect(page.locator("#success-message")).toContainText("New Owner Created");
+    await expect(page.getByText(`${owner.firstName} ${owner.lastName}`, { exact: true })).toBeVisible();
+
+    await updateCurrentOwner(page, updatedOwner);
+
+    await expect(page.locator("#success-message")).toContainText("Owner Values Updated");
+    await expect(page.getByText(updatedOwner.address, { exact: true })).toBeVisible();
+    await expect(page.getByText(updatedOwner.city, { exact: true })).toBeVisible();
+    await expect(page.getByText(updatedOwner.telephone, { exact: true })).toBeVisible();
+  });
+
   test("completes the owner, pet, and visit forms end to end", async ({ page }) => {
     const uniqueSuffix = `${Date.now()}`;
     const owner = {
@@ -115,6 +160,70 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
 
     await addVisitForCurrentPet(page, visit);
     await expect(page.locator("#success-message")).toContainText("Your visit has been booked");
+  });
+
+  test("supports editing an existing pet from the owner details page", async ({ page }) => {
+    const uniqueSuffix = `${Date.now()}`;
+    const owner = {
+      firstName: "Pet",
+      lastName: `Editor${uniqueSuffix}`,
+      address: "200 Update Lane",
+      city: "Sun Prairie",
+      telephone: "6085553333"
+    };
+    const pet = {
+      name: `Buddy${uniqueSuffix}`,
+      birthDate: "2020-05-12",
+      type: "dog"
+    };
+    const updatedPet = {
+      name: `Milo${uniqueSuffix}`,
+      birthDate: "2020-06-15",
+      type: "cat"
+    };
+
+    await createOwner(page, owner);
+    await addPetForCurrentOwner(page, pet);
+    await updateCurrentPet(page, updatedPet);
+
+    await expect(page.locator("#success-message")).toContainText("Pet details has been edited");
+    await expect(page.getByText(updatedPet.name, { exact: true })).toBeVisible();
+    await expect(page.locator("body")).toContainText(updatedPet.birthDate);
+    await expect(page.locator("body")).toContainText(/cat/i);
+  });
+
+  test("shows the visit summary and previous visits for a follow-up visit flow", async ({ page }) => {
+    const uniqueSuffix = `${Date.now()}`;
+    const owner = {
+      firstName: "Visit",
+      lastName: `Summary${uniqueSuffix}`,
+      address: "300 History Road",
+      city: "Middleton",
+      telephone: "6085554444"
+    };
+    const pet = {
+      name: `Comet${uniqueSuffix}`,
+      birthDate: "2021-03-01",
+      type: "dog"
+    };
+    const firstVisit = {
+      date: "2024-05-12",
+      description: `Initial visit ${uniqueSuffix}`
+    };
+
+    await createOwner(page, owner);
+    await addPetForCurrentOwner(page, pet);
+    await addVisitForCurrentPet(page, firstVisit);
+    await openVisitFormForCurrentPet(page);
+
+    await expectVisitFormSummary(page, {
+      petName: pet.name,
+      ownerName: `${owner.firstName} ${owner.lastName}`,
+      petType: pet.type
+    });
+    await expect(page.getByLabel(/^Date$/i)).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+    await expect(page.locator("table.table-striped").nth(1)).toContainText(firstVisit.description);
+    await expect(page.locator("table.table-striped").nth(1)).toContainText(firstVisit.date);
   });
 
   test("validates required owner fields and custom telephone rules", async ({ page }) => {

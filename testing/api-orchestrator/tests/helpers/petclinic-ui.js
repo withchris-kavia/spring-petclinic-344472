@@ -415,6 +415,121 @@ export async function addVisitForCurrentPet(page, visit) {
 
 // PUBLIC_INTERFACE
 /**
+ * Opens the owner edit form from the current owner-details page, applies the provided
+ * field updates, and waits for the owner-details view to become ready again.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {{
+ *   firstName?: string,
+ *   lastName?: string,
+ *   address?: string,
+ *   city?: string,
+ *   telephone?: string
+ * }} ownerUpdates - Owner fields to update through the edit form.
+ * @returns {Promise<void>} Resolves after the updated owner details page is visible.
+ */
+export async function updateCurrentOwner(page, ownerUpdates) {
+  await page.getByRole("link", { name: /Edit Owner/i }).click();
+  await expect(page.getByRole("heading", { name: /^Owner$/i })).toBeVisible();
+
+  if (ownerUpdates.firstName !== undefined) {
+    await page.getByLabel(/First Name/i).fill(ownerUpdates.firstName);
+  }
+
+  if (ownerUpdates.lastName !== undefined) {
+    await page.getByLabel(/Last Name/i).fill(ownerUpdates.lastName);
+  }
+
+  if (ownerUpdates.address !== undefined) {
+    await page.getByLabel(/Address/i).fill(ownerUpdates.address);
+  }
+
+  if (ownerUpdates.city !== undefined) {
+    await page.getByLabel(/City/i).fill(ownerUpdates.city);
+  }
+
+  if (ownerUpdates.telephone !== undefined) {
+    await page.getByLabel(/Telephone/i).fill(ownerUpdates.telephone);
+  }
+
+  await page.getByRole("button", { name: /Update Owner/i }).click();
+  await expectOwnerDetailsRouteReady(page);
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Opens the first available pet edit form from the current owner-details page, applies
+ * the provided pet updates, and waits for the owner-details view to become ready again.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {{
+ *   name?: string,
+ *   birthDate?: string,
+ *   type?: string
+ * }} petUpdates - Pet fields to update through the edit form.
+ * @returns {Promise<void>} Resolves after the updated owner details page is visible.
+ */
+export async function updateCurrentPet(page, petUpdates) {
+  await page.getByRole("link", { name: /Edit Pet/i }).first().click();
+  await expect(page.getByRole("heading", { name: /Pet/i })).toBeVisible();
+
+  if (petUpdates.name !== undefined) {
+    await page.getByLabel(/^Name$/i).fill(petUpdates.name);
+  }
+
+  if (petUpdates.birthDate !== undefined) {
+    await page.getByLabel(/Birth Date/i).fill(petUpdates.birthDate);
+  }
+
+  if (petUpdates.type !== undefined) {
+    await page.getByLabel(/^Type$/i).selectOption({ label: petUpdates.type });
+  }
+
+  await page.getByRole("button", { name: /Update Pet/i }).click();
+  await expectOwnerDetailsRouteReady(page);
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Opens the first available visit form from the current owner-details page and waits
+ * for the visit screen to become ready for assertions.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @returns {Promise<void>} Resolves after the visit form is visible.
+ */
+export async function openVisitFormForCurrentPet(page) {
+  await page.getByRole("link", { name: /Add Visit/i }).first().click();
+  await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Verifies that the visit form renders the pet summary table and previous-visits
+ * section for the currently selected owner and pet.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {{
+ *   petName: string,
+ *   ownerName: string,
+ *   petType?: string
+ * }} summary - Expected pet/owner values shown in the visit form summary table.
+ * @returns {Promise<void>} Resolves after the visit-form summary assertions pass.
+ */
+export async function expectVisitFormSummary(page, summary) {
+  const summaryTable = page.locator("table.table-striped").first();
+
+  await expect(page.getByRole("heading", { name: /Visit/i })).toBeVisible();
+  await expect(page.getByText(/Previous Visits/i)).toBeVisible();
+  await expect(summaryTable).toContainText(summary.petName);
+  await expect(summaryTable).toContainText(summary.ownerName);
+
+  if (summary.petType) {
+    await expect(summaryTable).toContainText(new RegExp(summary.petType, "i"));
+  }
+}
+
+// PUBLIC_INTERFACE
+/**
  * Searches for a seeded owner by last name and verifies the owner details page is displayed.
  *
  * @param {import("@playwright/test").Page} page - The current Playwright page.
