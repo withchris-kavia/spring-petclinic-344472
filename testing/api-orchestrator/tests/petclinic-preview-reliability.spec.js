@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  expectOwnerDetailsRouteReady,
   gotoRoute,
   gotoRouteWithTiming,
   retryPetclinicAction,
@@ -94,7 +95,7 @@ test.describe("Spring Petclinic preview UI reliability and performance", () => {
         await submitOwnerSearch(page, "Franklin", { timeoutMs: 1_500 });
 
         await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
-        await expect(page.getByRole("link", { name: /Add New Pet/i })).toBeVisible();
+        await expectOwnerDetailsRouteReady(page);
       },
       {
         attempts: 2,

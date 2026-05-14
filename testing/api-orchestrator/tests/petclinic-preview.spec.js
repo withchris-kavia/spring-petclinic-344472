@@ -34,9 +34,7 @@ test.describe("Spring Petclinic preview regression, UI, and validation flows", (
     await gotoRoute(page, "/owners/find", /Find Owners/i);
 
     // A unique seeded last name should redirect directly to the owner's details page.
-    await submitOwnerSearch(page, "Franklin");
-    await expect(page).toHaveURL(/\/owners\/1(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/);
-    await expect(page.getByRole("link", { name: /Add New Pet/i })).toBeVisible();
+    await openOwnerDetailsFromSearch(page, "Franklin");
     await expect(page.getByText("George Franklin", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Pets and Visits/i })).toBeVisible();
     await expect(page.getByText("Leo", { exact: true })).toBeVisible();

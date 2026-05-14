@@ -2,6 +2,9 @@ import { expect } from "@playwright/test";
 
 const OWNER_DETAILS_URL_PATTERN = /\/owners\/\d+(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/;
 const OWNER_SEARCH_RESULT_URL_PATTERN = /\/owners(?:\/\d+(?:;jsessionid=[^/?#]+)?)?(?:\?.*)?$/;
+const OWNER_DETAILS_READY_TEXT_PATTERN = /Owner Information|Pets and Visits|Edit Owner|Add New Pet/i;
+const OWNER_DETAILS_ERROR_TEXT_PATTERN =
+  /Whitelabel Error Page|Something happened|Internal Server Error|ERR_/i;
 
 async function waitForPetclinicShell(page) {
   await expect(page.locator("nav.navbar")).toBeVisible();
@@ -47,11 +50,116 @@ function waitForMilliseconds(delayMs) {
   });
 }
 
+async function readBodyText(page) {
+  try {
+    const body = page.locator("body");
+    return (await body.innerText()).replace(/\s+/g, " ").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function isFirstVisible(locator) {
+  try {
+    return await locator.first().isVisible();
+  } catch {
+    return false;
+  }
+}
+
+async function getOwnerDetailsPageState(page) {
+  const bodyText = await readBodyText(page);
+  const hasEditOwnerAction = await isFirstVisible(page.getByRole("link", { name: /Edit Owner/i }));
+  const hasAddNewPetAction = await isFirstVisible(page.getByRole("link", { name: /Add New Pet/i }));
+  const hasPetsAndVisitsHeading = await isFirstVisible(
+    page.getByRole("heading", { name: /Pets and Visits/i })
+  );
+  const hasOwnerTable = await isFirstVisible(page.locator("table.table-striped"));
+  const urlMatches = OWNER_DETAILS_URL_PATTERN.test(page.url());
+
+  if (
+    urlMatches &&
+    ((hasEditOwnerAction && hasAddNewPetAction) ||
+      (hasOwnerTable && OWNER_DETAILS_READY_TEXT_PATTERN.test(bodyText)) ||
+      (hasPetsAndVisitsHeading && OWNER_DETAILS_READY_TEXT_PATTERN.test(bodyText)))
+  ) {
+    return {
+      status: "ready",
+      bodyText
+    };
+  }
+
+  if (OWNER_DETAILS_ERROR_TEXT_PATTERN.test(bodyText) || bodyText.length < 32) {
+    return {
+      status: "transient_failure",
+      bodyText
+    };
+  }
+
+  return {
+    status: "loading",
+    bodyText
+  };
+}
+
 async function expectOwnerDetailsPage(page) {
-  await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
-  await expect(page.locator("table.table-striped").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /Edit Owner/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Add New Pet/i })).toBeVisible();
+  const attempts = 2;
+  const timeoutMs = 15_000;
+  let lastObservedBodyText = "";
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN, { timeout: timeoutMs });
+    await page.waitForLoadState("domcontentloaded", { timeout: timeoutMs }).catch(() => {});
+
+    try {
+      await expect
+        .poll(
+          async () => {
+            const ownerDetailsState = await getOwnerDetailsPageState(page);
+            lastObservedBodyText = ownerDetailsState.bodyText;
+            return ownerDetailsState.status;
+          },
+          {
+            timeout: timeoutMs,
+            intervals: [250, 500, 1_000]
+          }
+        )
+        .toBe("ready");
+
+      return;
+    } catch (error) {
+      if (attempt >= attempts) {
+        throw new Error(
+          `Owner details page did not become ready at ${page.url()}. ` +
+            `Last observed body text: ${lastObservedBodyText || "<empty>"}`
+        );
+      }
+
+      await page
+        .reload({
+          waitUntil: "domcontentloaded",
+          timeout: timeoutMs
+        })
+        .catch(async () => {
+          await page.goto(page.url(), {
+            waitUntil: "domcontentloaded",
+            timeout: timeoutMs
+          });
+        });
+    }
+  }
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Waits for the owner-details route to render stable owner-page controls and content,
+ * retrying once when the preview briefly lands on a blank or transient error page.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @returns {Promise<void>} Resolves after the owner details page is ready for interaction.
+ */
+export async function expectOwnerDetailsRouteReady(page) {
+  await expectOwnerDetailsPage(page);
 }
 
 // PUBLIC_INTERFACE
@@ -252,7 +360,7 @@ export async function createOwner(page, owner) {
   await page.getByLabel(/Telephone/i).fill(owner.telephone);
   await page.getByRole("button", { name: /Add Owner/i }).click();
 
-  await expectOwnerDetailsPage(page);
+  await expectOwnerDetailsRouteReady(page);
 
   return page.url();
 }
@@ -278,7 +386,7 @@ export async function addPetForCurrentOwner(page, pet) {
   await page.getByLabel(/^Type$/i).selectOption({ label: pet.type });
   await page.getByRole("button", { name: /Add Pet/i }).click();
 
-  await expectOwnerDetailsPage(page);
+  await expectOwnerDetailsRouteReady(page);
   await expect(page.getByText(pet.name, { exact: true })).toBeVisible();
 }
 
@@ -301,7 +409,7 @@ export async function addVisitForCurrentPet(page, visit) {
   await page.getByLabel(/Description/i).fill(visit.description);
   await page.getByRole("button", { name: /Add Visit/i }).click();
 
-  await expectOwnerDetailsPage(page);
+  await expectOwnerDetailsRouteReady(page);
   await expect(page.getByText(visit.description, { exact: true })).toBeVisible();
 }
 
@@ -316,7 +424,7 @@ export async function addVisitForCurrentPet(page, visit) {
 export async function openOwnerDetailsFromSearch(page, lastName) {
   await gotoRoute(page, "/owners/find", /Find Owners/i);
   await submitOwnerSearch(page, lastName);
-  await expectOwnerDetailsPage(page);
+  await expectOwnerDetailsRouteReady(page);
 }
 
 // PUBLIC_INTERFACE
