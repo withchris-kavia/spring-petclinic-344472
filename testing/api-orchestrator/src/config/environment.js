@@ -62,7 +62,7 @@ export function loadEnvironmentConfig() {
   const workspaceRoot = getWorkspaceRoot();
   const applicationRoot = path.resolve(workspaceRoot, "..", "..");
   const outputDir = process.env.API_TEST_OUTPUT_DIR ?? "./artifacts";
-  const targetBaseUrl = process.env.API_TEST_TARGET_BASE_URL ?? "http://127.0.0.1:8080";
+  const targetBaseUrl = process.env.API_TEST_TARGET_BASE_URL ?? "http://127.0.0.1:3001";
   const normalizedBaseUrl = targetBaseUrl.replace(/\/$/, "");
   const ciMode = parseBoolean(process.env.CI, false);
 
