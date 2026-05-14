@@ -45,4 +45,5 @@ Install browser dependencies if needed:
 
 - The suite uses stable user-facing headings, labels, and seeded demo data to keep assertions readable.
 - The owner/pet/visit flow generates unique values so repeated runs do not collide with earlier E2E-created records.
-- The tests are intentionally grouped as a serial suite because several flows create persistent demo data.
+- The tests are written to run independently so one failure does not block the remaining preview coverage.
+- On failure, Playwright retains trace, screenshot, and video artifacts under `artifacts/playwright-output/` and writes JSON/JUnit/HTML reports under `artifacts/reports/`.

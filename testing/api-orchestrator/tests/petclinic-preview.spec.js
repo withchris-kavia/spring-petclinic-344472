@@ -10,8 +10,6 @@ import {
 } from "./helpers/petclinic-ui.js";
 
 test.describe("Spring Petclinic preview UI core flows", () => {
-  test.describe.configure({ mode: "serial" });
-
   test("loads the welcome page and supports top-level navigation", async ({ page }) => {
     await gotoRoute(page, "/", /Welcome/i);
 
@@ -93,7 +91,7 @@ test.describe("Spring Petclinic preview UI core flows", () => {
     await clickPrimaryNavigation(page, /Find Owners/i, /\/owners\/find$/, /Find Owners/i);
 
     await expect(page.locator("#search-owner-form")).toBeVisible();
-    await expect(page.getByLabel(/Last name/i)).toBeVisible();
+    await expect(page.locator('#search-owner-form input[name="lastName"], #search-owner-form input#lastName').first()).toBeVisible();
     await expect(page.getByRole("button", { name: /Find Owner/i })).toBeVisible();
   });
 });

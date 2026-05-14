@@ -20,7 +20,7 @@
     "pipeline:ci": "CI=true API_TEST_HEADLESS=true node ./src/cli.js pipeline",
     "pipeline:parallel": "API_TEST_PARALLELISM=4 API_TEST_HEADLESS=true node ./src/cli.js pipeline",
     "test:e2e": "playwright test --config ./playwright.config.js",
-    "test:e2e:ci": "CI=true playwright test --config ./playwright.config.js --reporter=line",
+    "test:e2e:ci": "CI=true playwright test --config ./playwright.config.js",
     "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {

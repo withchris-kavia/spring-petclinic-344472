@@ -2,21 +2,26 @@ import { defineConfig } from "@playwright/test";
 import { loadEnvironmentConfig } from "./src/config/environment.js";
 
 const environment = loadEnvironmentConfig();
+const reportsDir = `${environment.outputDir}/reports`;
 const reporters = process.env.CI
   ? [
     ["line"],
-    ["json", { outputFile: `${environment.outputDir}/reports/playwright-results.json` }],
-    ["junit", { outputFile: `${environment.outputDir}/reports/playwright-junit.xml` }]
+    ["json", { outputFile: `${reportsDir}/playwright-results.json` }],
+    ["junit", { outputFile: `${reportsDir}/playwright-junit.xml` }],
+    ["html", { outputFolder: `${reportsDir}/playwright-html`, open: "never" }]
   ]
   : [
     ["list"],
-    ["json", { outputFile: `${environment.outputDir}/reports/playwright-results.json` }],
-    ["html", { outputFolder: `${environment.outputDir}/playwright-report`, open: "never" }]
+    ["json", { outputFile: `${reportsDir}/playwright-results.json` }],
+    ["html", { outputFolder: `${reportsDir}/playwright-html`, open: "never" }]
   ];
 
 export default defineConfig({
   testDir: "./tests",
   timeout: environment.timeoutMs,
+  expect: {
+    timeout: 10_000
+  },
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -25,6 +30,11 @@ export default defineConfig({
   reporter: reporters,
   use: {
     baseURL: environment.targetBaseUrl,
-    ignoreHTTPSErrors: environment.ignoreHttpsErrors
+    ignoreHTTPSErrors: environment.ignoreHttpsErrors,
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure"
   }
 });

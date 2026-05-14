@@ -5,6 +5,17 @@ async function waitForPetclinicShell(page) {
   await expect(page.locator("body")).toBeVisible();
 }
 
+async function getOwnerSearchLastNameField(page) {
+  const searchForm = page.locator("#search-owner-form");
+  const lastNameField = searchForm.locator('input[name="lastName"], input#lastName').first();
+
+  await expect(searchForm).toBeVisible();
+  await expect(lastNameField).toBeVisible({ timeout: 10_000 });
+  await expect(lastNameField).toBeEditable({ timeout: 10_000 });
+
+  return lastNameField;
+}
+
 // PUBLIC_INTERFACE
 /**
  * Navigates to a Petclinic route and waits for the shared application shell and
@@ -67,8 +78,17 @@ export async function clickPrimaryNavigation(page, linkName, expectedUrl, expect
  * @returns {Promise<void>} Resolves after the search request is submitted.
  */
 export async function submitOwnerSearch(page, lastName) {
-  await page.getByLabel(/Last name/i).fill(lastName);
-  await page.getByRole("button", { name: /Find Owner/i }).click();
+  const searchForm = page.locator("#search-owner-form");
+  const lastNameField = await getOwnerSearchLastNameField(page);
+  const submitButton = searchForm.getByRole("button", { name: /Find Owner/i });
+
+  await lastNameField.fill(lastName, { timeout: 10_000 });
+  await expect(submitButton).toBeEnabled({ timeout: 10_000 });
+
+  await Promise.all([
+    page.waitForURL(/\/owners(?:\/\d+)?(?:\?.*)?$/, { timeout: 15_000 }),
+    submitButton.click()
+  ]);
 }
 
 // PUBLIC_INTERFACE
