@@ -16,6 +16,13 @@ async function getOwnerSearchLastNameField(page) {
   return lastNameField;
 }
 
+const OWNER_DETAILS_URL_PATTERN = /\/owners\/\d+(?:;jsessionid=[^/?#]+)?(?:\?.*)?$/;
+
+async function expectOwnerDetailsPage(page) {
+  await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
+  await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+}
+
 // PUBLIC_INTERFACE
 /**
  * Navigates to a Petclinic route and waits for the shared application shell and
@@ -115,8 +122,7 @@ export async function createOwner(page, owner) {
   await page.getByLabel(/Telephone/i).fill(owner.telephone);
   await page.getByRole("button", { name: /Add Owner/i }).click();
 
-  await expect(page).toHaveURL(/\/owners\/\d+$/);
-  await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+  await expectOwnerDetailsPage(page);
 
   return page.url();
 }
@@ -142,8 +148,7 @@ export async function addPetForCurrentOwner(page, pet) {
   await page.getByLabel(/^Type$/i).selectOption({ label: pet.type });
   await page.getByRole("button", { name: /Add Pet/i }).click();
 
-  await expect(page).toHaveURL(/\/owners\/\d+$/);
-  await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+  await expectOwnerDetailsPage(page);
   await expect(page.getByText(pet.name, { exact: true })).toBeVisible();
 }
 
@@ -166,7 +171,6 @@ export async function addVisitForCurrentPet(page, visit) {
   await page.getByLabel(/Description/i).fill(visit.description);
   await page.getByRole("button", { name: /Add Visit/i }).click();
 
-  await expect(page).toHaveURL(/\/owners\/\d+$/);
-  await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
+  await expectOwnerDetailsPage(page);
   await expect(page.getByText(visit.description, { exact: true })).toBeVisible();
 }
