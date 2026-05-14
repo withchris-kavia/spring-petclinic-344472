@@ -29,7 +29,12 @@ function resolveFormLocator(page, formOrSelector = "form") {
 
 function getFieldGroup(formLocator, fieldSelector) {
   const field = formLocator.locator(fieldSelector).first();
-  return formLocator.locator(".form-group", { has: field }).first();
+  return field.locator(
+    "xpath=ancestor::*[" +
+      "contains(concat(' ', normalize-space(@class), ' '), ' form-group ') or " +
+      "contains(concat(' ', normalize-space(@class), ' '), ' control-group ')" +
+      "][1]"
+  );
 }
 
 function waitForMilliseconds(delayMs) {
@@ -327,9 +332,16 @@ export async function openOwnerDetailsFromSearch(page, lastName) {
 export async function expectFormFieldError(page, options) {
   const formLocator = resolveFormLocator(page, options.form ?? "form");
   const fieldGroup = getFieldGroup(formLocator, options.fieldSelector);
+  const inlineError = fieldGroup.locator(".help-inline, .help-block, [role='alert']").first();
 
   await expect(formLocator).toBeVisible();
   await expect(fieldGroup).toBeVisible();
+
+  if ((await inlineError.count()) > 0) {
+    await expect(inlineError).toContainText(options.errorPattern);
+    return;
+  }
+
   await expect(fieldGroup).toContainText(options.errorPattern);
 }
 

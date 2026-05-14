@@ -40,16 +40,19 @@ test.describe("Spring Petclinic preview API response validation", () => {
       params: {
         lastName: noMatchLastName
       },
-      bodyPatterns: [/Find Owners/i, /not found/i]
+      bodyPatterns: [/Find Owners/i, /has not been found|not found/i]
     });
 
     expect(response.ok()).toBeTruthy();
-    expect(body).toContain("not found");
+    expect(body).toMatch(/has not been found|not found/i);
   });
 
-  test("returns the shared error page for the crash route", async ({ request }) => {
+  test("returns negotiated error responses for the crash route", async ({ request }) => {
     const { body } = await fetchHtmlResponse(request, "/oups", {
       expectedStatus: 500,
+      headers: {
+        Accept: "text/html"
+      },
       bodyPatterns: [
         /Something happened/i,
         /internal server error occurred|unexpected error occurred/i,
@@ -58,5 +61,17 @@ test.describe("Spring Petclinic preview API response validation", () => {
     });
 
     expect(body).toContain("Expected: controller used to showcase");
+
+    const { json: errorPayload, response: jsonResponse } = await fetchJsonResponse(request, "/oups", {
+      expectedStatus: 500,
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    expect(jsonResponse.ok()).toBeFalsy();
+    expect(errorPayload.status).toBe(500);
+    expect(String(errorPayload.path ?? "")).toContain("/oups");
+    expect(String(errorPayload.error ?? "")).toMatch(/error/i);
   });
 });

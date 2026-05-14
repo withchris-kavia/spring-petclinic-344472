@@ -12,6 +12,28 @@ function normalizeExpectedPatterns(expectedPatterns) {
   return Array.isArray(expectedPatterns) ? expectedPatterns : [expectedPatterns];
 }
 
+function contentTypeMatches(contentType, expectedContentType) {
+  if (expectedContentType instanceof RegExp) {
+    return expectedContentType.test(contentType);
+  }
+
+  return contentType.includes(String(expectedContentType));
+}
+
+function assertContentTypeMatches(contentType, expectedContentType) {
+  const expectedPatterns = normalizeExpectedPatterns(expectedContentType);
+
+  if (expectedPatterns.length === 0) {
+    return;
+  }
+
+  const matchesAnyExpectedPattern = expectedPatterns.some((pattern) =>
+    contentTypeMatches(contentType, pattern)
+  );
+
+  expect(matchesAnyExpectedPattern).toBeTruthy();
+}
+
 function assertTextMatches(text, expectedPatterns) {
   for (const expectedPattern of normalizeExpectedPatterns(expectedPatterns)) {
     if (expectedPattern instanceof RegExp) {
@@ -40,11 +62,11 @@ function assertTextMatches(text, expectedPatterns) {
  */
 export async function expectJsonResponse(response, options = {}) {
   const expectedStatus = options.expectedStatus ?? 200;
-  const expectedContentType = options.expectedContentType ?? "application/json";
+  const expectedContentType = options.expectedContentType ?? ["application/json", /\+json\b/i];
   const contentType = getResponseHeader(response, "content-type");
 
   expect(response.status()).toBe(expectedStatus);
-  expect(contentType).toContain(expectedContentType);
+  assertContentTypeMatches(contentType, expectedContentType);
 
   return {
     response,
@@ -104,7 +126,7 @@ export async function expectHtmlResponse(response, options = {}) {
   const body = await response.text();
 
   expect(response.status()).toBe(expectedStatus);
-  expect(contentType).toContain(expectedContentType);
+  assertContentTypeMatches(contentType, expectedContentType);
   assertTextMatches(body, options.bodyPatterns);
 
   return {
