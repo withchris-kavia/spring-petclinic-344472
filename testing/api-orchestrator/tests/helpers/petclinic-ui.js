@@ -32,6 +32,16 @@ function getFieldGroup(formLocator, fieldSelector) {
   return formLocator.locator(".form-group", { has: field }).first();
 }
 
+function waitForMilliseconds(delayMs) {
+  if (!Number.isFinite(delayMs) || delayMs <= 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
 async function expectOwnerDetailsPage(page) {
   await expect(page).toHaveURL(OWNER_DETAILS_URL_PATTERN);
   await expect(page.getByRole("heading", { name: /Owner Information/i })).toBeVisible();
@@ -54,6 +64,102 @@ export async function gotoRoute(page, path, expectedHeading) {
   if (expectedHeading) {
     await expect(page.getByRole("heading", { name: expectedHeading })).toBeVisible();
   }
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Navigates to a Petclinic route, waits for the shared shell, and returns a simple
+ * timing snapshot that reliability-oriented tests can assert against.
+ *
+ * @param {import("@playwright/test").Page} page - The current Playwright page.
+ * @param {string} path - Relative application path to visit.
+ * @param {string | RegExp} [expectedHeading] - Optional heading expected on the destination page.
+ * @param {{
+ *   gotoOptions?: Parameters<import("@playwright/test").Page["goto"]>[1],
+ *   headingTimeoutMs?: number
+ * }} [options] - Optional navigation and heading-visibility controls.
+ * @returns {Promise<{
+ *   navigationDurationMs: number,
+ *   finalUrl: string
+ * }>} Timing data for the completed navigation.
+ */
+export async function gotoRouteWithTiming(page, path, expectedHeading, options = {}) {
+  const startedAt = Date.now();
+
+  await page.goto(path, options.gotoOptions);
+  await waitForPetclinicShell(page);
+
+  if (expectedHeading) {
+    await expect(page.getByRole("heading", { name: expectedHeading })).toBeVisible({
+      timeout: options.headingTimeoutMs ?? 10_000
+    });
+  }
+
+  return {
+    navigationDurationMs: Date.now() - startedAt,
+    finalUrl: page.url()
+  };
+}
+
+// PUBLIC_INTERFACE
+/**
+ * Executes a reusable asynchronous UI action with bounded retries so reliability
+ * tests can simulate transient failures and verify successful recovery behavior.
+ *
+ * @template T
+ * @param {(attempt: number) => Promise<T>} action - Asynchronous action to run for each attempt.
+ * @param {{
+ *   attempts?: number,
+ *   delayMs?: number,
+ *   shouldRetry?: (error: unknown, attempt: number) => boolean | Promise<boolean>,
+ *   onRetry?: (context: {
+ *     error: unknown,
+ *     attempt: number,
+ *     attempts: number
+ *   }) => Promise<void> | void
+ * }} [options] - Retry controls and optional retry hooks.
+ * @returns {Promise<{
+ *   attemptCount: number,
+ *   result: T
+ * }>} The successful result and the attempt number that produced it.
+ */
+export async function retryPetclinicAction(action, options = {}) {
+  const attempts = Math.max(options.attempts ?? 2, 1);
+  const delayMs = Math.max(options.delayMs ?? 0, 0);
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const result = await action(attempt);
+
+      return {
+        attemptCount: attempt,
+        result
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= attempts) {
+        throw error;
+      }
+
+      const shouldRetry = options.shouldRetry
+        ? await options.shouldRetry(error, attempt)
+        : true;
+
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      if (options.onRetry) {
+        await options.onRetry({ error, attempt, attempts });
+      }
+
+      await waitForMilliseconds(delayMs);
+    }
+  }
+
+  throw lastError;
 }
 
 // PUBLIC_INTERFACE
@@ -96,9 +202,12 @@ export async function clickPrimaryNavigation(page, linkName, expectedUrl, expect
  *
  * @param {import("@playwright/test").Page} page - The current Playwright page.
  * @param {string} lastName - Last-name search term to submit.
+ * @param {{
+ *   timeoutMs?: number
+ * }} [options] - Optional navigation timeout overrides for resilience scenarios.
  * @returns {Promise<void>} Resolves after the search request is submitted.
  */
-export async function submitOwnerSearch(page, lastName) {
+export async function submitOwnerSearch(page, lastName, options = {}) {
   const searchForm = page.locator("#search-owner-form");
   const lastNameField = await getOwnerSearchLastNameField(page);
   const submitButton = searchForm.getByRole("button", { name: /Find Owner/i });
@@ -107,7 +216,7 @@ export async function submitOwnerSearch(page, lastName) {
   await expect(submitButton).toBeEnabled({ timeout: 10_000 });
 
   await Promise.all([
-    page.waitForURL(OWNER_SEARCH_RESULT_URL_PATTERN, { timeout: 15_000 }),
+    page.waitForURL(OWNER_SEARCH_RESULT_URL_PATTERN, { timeout: options.timeoutMs ?? 15_000 }),
     submitButton.click()
   ]);
 }
